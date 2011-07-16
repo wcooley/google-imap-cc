@@ -1,6 +1,6 @@
 import email
 import imaplib
-from pyparsing import Word, alphas, nums, printables, ZeroOrMore
+from pyparsing import Word, alphas, nums, printables, ZeroOrMore, ParseException
 
 class imapstat:
     def __init__(self, imapserver=None, adminuser=None, adminpassword=None):
@@ -110,11 +110,23 @@ class imapstat:
         parsed = set()
 
         for raw_mbox in rawdata:
-            try:
-                parsed.add(mbox_parse(raw_mbox).pop())
+            if isinstance(raw_mbox, tuple):
+                try:
+                    parsed.add(raw_mbox[1])
 
-            except:
-                raise Exception("Error parsing %s" % raw_mbox)
+                except IndexError:
+                    raise Exception("Error unpacking tuple %s" % str(raw_mbox))
+
+            else:
+                if raw_mbox == "":
+                    parsed.add(raw_mbox)
+
+                else:
+                    try:
+                        parsed.add(mbox_parse(raw_mbox).pop())
+        
+                    except:
+                        raise Exception("Error parsing %s" % str(raw_mbox))
 
         return list(parsed)
 
