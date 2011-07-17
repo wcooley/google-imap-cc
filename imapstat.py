@@ -61,7 +61,7 @@ class imapstat:
         quota_used = Word(nums)
         quota = Word(nums)
 
-        quota_form = rootname + '(' + resource + quota_used + quota + ')'
+        quota_form = rootname + '(' + ZeroOrMore(resource + quota_used + quota) + ')'
 
         quota_parse = quota_form.parseString
 
@@ -103,30 +103,34 @@ class imapstat:
         root = Word(alphas + '/')
         mboxname = Word(printables + ' ')
 
-        mbox_form = '(' + ZeroOrMore(flags) + ')' + '"' + root  + '"' + mboxname
+        mbox_format = '(' + ZeroOrMore(flags) + ')' + '"' + root  + '"' + mboxname
 
-        mbox_parse = mbox_form.parseString
+        mbox_formats = ZeroOrMore(mbox_format)
+
+        mbox_parse = mbox_formats.parseString
 
         parsed = set()
 
         for raw_mbox in rawdata:
-            if isinstance(raw_mbox, tuple):
+            if isinstance(raw_mbox, str):
                 try:
-                    parsed.add(raw_mbox[1])
+                    parsed.add(mbox_parse(raw_mbox)[-1])
+
+                except IndexError:
+                    parsed.add("")
+
+                except:
+                    raise Exception("Error parsing string %s" % str(raw_mbox))
+
+            elif isinstance(raw_mbox, tuple):
+                try:
+                    parsed.add(raw_mbox[-1])
 
                 except IndexError:
                     raise Exception("Error unpacking tuple %s" % str(raw_mbox))
 
             else:
-                if raw_mbox == "":
-                    parsed.add(raw_mbox)
-
-                else:
-                    try:
-                        parsed.add(mbox_parse(raw_mbox).pop())
-        
-                    except:
-                        raise Exception("Error parsing %s" % str(raw_mbox))
+                raise Exception("Error processing %s" % str(raw_mbox))
 
         return list(parsed)
 
