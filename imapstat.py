@@ -43,17 +43,15 @@ class imapstat:
 
         >>> ims = imapstat()
         >>> good = [['INBOX INBOX'], ['INBOX (STORAGE 151788 1000000)']]
+        >>> nullquota = [['INBOX INBOX'], ['INBOX ()']]
         >>> bad = [['INBOX INBOX'], ['YUCK INBOX (STORAGE 151788 1000000)']]
         >>> ims.parsequota(rawdata = good)
         (151788, 1000000)
+        >>> ims.parsequota(rawdata = nullquota)
+        (0, 0)
         >>> ims.parsequota(rawdata = bad)
         Traceback (most recent call last):
-          File "/usr/lib64/python2.7/doctest.py", line 1248, in __run
-            compileflags, 1) in test.globs
-          File "<doctest __main__.imapstat.parsequota[4]>", line 1, in <module>
-            ims.parsequota(rawdata = bad)
-          File "./imapstat.py", line 70, in parsequota
-            raise Exception("Error parsing: %s" % rawdata[1])
+            ...
         Exception: Error parsing: ['YUCK INBOX (STORAGE 151788 1000000)']
         """
         rootname = Word(alphas)
@@ -65,17 +63,18 @@ class imapstat:
 
         quota_parse = quota_form.parseString
 
-        quota, quota_used = (0, 0)
-
         try:
             parsed = quota_parse(rawdata[1][0])
-            quota_used = int(parsed[3])
+            used_quota = int(parsed[3])
             quota = int(parsed[4])
+
+        except IndexError:
+            quota, used_quota = (0, 0)
 
         except:
             raise Exception("Error parsing: %s" % rawdata[1])
 
-        return (quota_used, quota)
+        return (used_quota, quota)
 
 
     def parsemboxlist(self, rawdata):
@@ -83,31 +82,33 @@ class imapstat:
         ['(\\Noinferiors) "/" "INBOX"', '(\\HasNoChildren) "/" "Drafts"']
         Notice how it's a list of quoted strings.
 
+        For strings that contain string delimiting characters, the data is
+        returned as a tuple.
+
         Returns a list of quoted mailbox names "INBOX", "Drafts"...
 
         Example:
 
         >>> ims = imapstat()
-        >>> good = ['(\\Noinferiors) "/" "INBOX"', '(\\HasNoChildren) "/" "Drafts"', '(\\HasNoChildren) "/" "I Love Spam"', '(\\HasNoChildren) "/" "Notes"', '(\\HasNoChildren) "/" "Sent"', '(\\HasChildren) "/" "Trash"', '(\\HasNoChildren) "/" "Trash/Sent"', '(\\HasNoChildren) "/" "Trash/Sent Messages"', '(\\HasChildren) "/" "_CECS"', '(\\HasNoChildren) "/" "_CECS/Announce"', '(\\HasNoChildren) "/" "_CECS/Asynchronous"', '(\\HasNoChildren) "/" "_CECS/CAT"', '(\\HasNoChildren) "/" "_CECS/CS162"', '(\\HasNoChildren) "/" "_CECS/CS163"', '(\\HasNoChildren) "/" "_CECS/CS201"', '(\\HasNoChildren) "/" "_CECS/CS202"']
-        >>> bad = ['(\\Noinferiors) "/\\\\\\\\\\\\\\\\\\" "INBOX"']
-        >>> ims.parsemboxlist(good)
-        ['"_CECS/Asynchronous"', '"_CECS/CS162"', '"Trash/Sent Messages"', '"_CECS/CAT"', '"_CECS/Announce"', '"_CECS"', '"_CECS/CS201"', '"I Love Spam"', '"Sent"', '"INBOX"', '"Trash/Sent"', '"Notes"', '"Drafts"', '"Trash"', '"_CECS/CS163"', '"_CECS/CS202"']
+        >>> goodstrings = ['(\\Noinferiors) "/" "INBOX"', '(\\HasNoChildren) "/" "Drafts"', '(\\HasNoChildren) "/" "I Love Spam"', '(\\HasNoChildren) "/" "Notes"', '(\\HasNoChildren) "/" "Sent"', '(\\HasChildren) "/" "Trash"', '(\\HasNoChildren) "/" "Trash/Sent"', '(\\HasNoChildren) "/" "Trash/Sent Messages"', '(\\HasChildren) "/" "_CECS"', '(\\HasNoChildren) "/" "_CECS/Announce"', '(\\HasNoChildren) "/" "_CECS/Asynchronous"', '(\\HasNoChildren) "/" "_CECS/CAT"', '(\\HasNoChildren) "/" "_CECS/CS162"', '(\\HasNoChildren) "/" "_CECS/CS163"', '(\\HasNoChildren) "/" "_CECS/CS201"', '(\\HasNoChildren) "/" "_CECS/CS202"', '']
+        >>> goodtuple = [('(\\HasNoChildren) "/" {34}', 'Other Users/hyndlatest/foo "quote"')]
+        >>> bad = ['(\\Noinferiors) "INBOX"']
+        >>> ims.parsemboxlist(goodstrings)
+        ['"_CECS/Asynchronous"', '', '"_CECS/CS162"', '"Trash/Sent Messages"', '"_CECS/CAT"', '"_CECS/Announce"', '"_CECS"', '"_CECS/CS201"', '"I Love Spam"', '"Sent"', '"INBOX"', '"Trash/Sent"', '"Notes"', '"Drafts"', '"Trash"', '"_CECS/CS163"', '"_CECS/CS202"']
+        >>> ims.parsemboxlist(goodtuple)
+        ['Other Users/hyndlatest/foo "quote"']
         >>> ims.parsemboxlist(bad)
         Traceback (most recent call last):
-          File "<input>", line 1, in <module>
-          File "imapstat.py", line 98, in parsemboxlist
-            raise Exception("Error parsing %s" % raw_mbox)
-        Exception: Error parsing (\Noinferiors) "/\\\\\\\\\" "INBOX"
+            ...
+        Exception: Error parsing string (\Noinferiors) "INBOX"
         """
         flags = Word(alphas + '\\')
         root = Word(alphas + '/')
         mboxname = Word(printables + ' ')
 
-        mbox_format = '(' + ZeroOrMore(flags) + ')' + '"' + root  + '"' + mboxname
+        mbox_format = '(' + ZeroOrMore(flags) + ')' + '"' + root + '"' + mboxname
 
-        mbox_formats = ZeroOrMore(mbox_format)
-
-        mbox_parse = mbox_formats.parseString
+        mbox_parse = mbox_format.parseString
 
         parsed = set()
 
@@ -116,11 +117,15 @@ class imapstat:
                 try:
                     parsed.add(mbox_parse(raw_mbox)[-1])
 
-                except IndexError:
-                    parsed.add("")
+                except ParseException:
+                    if raw_mbox == "":
+                        parsed.add("")
+
+                    else:
+                        raise Exception("Error parsing string %s" % str(raw_mbox))
 
                 except:
-                    raise Exception("Error parsing string %s" % str(raw_mbox))
+                    raise
 
             elif isinstance(raw_mbox, tuple):
                 try:
@@ -128,6 +133,9 @@ class imapstat:
 
                 except IndexError:
                     raise Exception("Error unpacking tuple %s" % str(raw_mbox))
+
+                except:
+                    raise
 
             else:
                 raise Exception("Error processing %s" % str(raw_mbox))
