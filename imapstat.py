@@ -146,8 +146,8 @@ class imapstat:
     def validatemboxnames(self, mboxes):
         """Takes a list of mailboxes as <mboxes> and searches for Google no-nos:
 
-        Leading whitespace,
-        Trailing whitespace,
+        Leading whitespace (also before /),
+        Trailing whitespace (also after /),
         More than one space,
         Mailboxes that are identical if treated case insensitively.
 
@@ -163,15 +163,16 @@ class imapstat:
         problems["multiple spaces"] = []
         problems["case collision"] = []
 
+        # Initial pass--find whitespace violations, and populate case match dict.
         for mbox in mboxes:
             if mbox == "":
                 pass
 
-            elif mbox[0] == " ":
+            elif mbox[0] == " " or mbox.find("/ ") != -1:
                 ok = False
                 problems["leading space"].append(mbox)
 
-            elif mbox[-1] == " ":
+            elif mbox[-1] == " " or mbox.find(" /") != -1:
                 ok = False
                 problems["trailing space"].append(mbox)
 
@@ -185,16 +186,19 @@ class imapstat:
             else:
                 case_check[mbox.lower()] = [mbox]
 
+        # Find case collisions.
         for mboxgroup in case_check.values():
             if len(mboxgroup) > 1:
                 ok = False
                 for mbox in mboxgroup:
                     problems["case collision"].append(mbox)
 
+        # Remove non-matching reasons.
         for (reason, mboxgroup) in problems.items():
             if mboxgroup == []:
                 problems.pop(reason)
 
+        # Return accordingly.
         if ok == False:
             return(problems)
 
