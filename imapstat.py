@@ -80,10 +80,10 @@ class imapstat:
     def parsemboxlist(self, rawdata):
         """Takes the raw output from a IMAP list mailboxes command, like so:
         ['(\\Noinferiors) "/" "INBOX"', '(\\HasNoChildren) "/" "Drafts"']
+
         Notice how it's a list of quoted strings.
 
-        For strings that contain string delimiting characters, the data is
-        returned as a tuple.
+        For strings that contain string delimiting characters, the data is returned as a tuple.
 
         Returns a list of quoted mailbox names "INBOX", "Drafts"...
 
@@ -112,39 +112,98 @@ class imapstat:
 
         parsed = set()
 
-        for raw_mbox in rawdata:
-            if isinstance(raw_mbox, str):
+        for rawdatum in rawdata:
+            if isinstance(rawdatum, str):
                 try:
-                    parsed.add(mbox_parse(raw_mbox)[-1])
+                    parsed.add(mbox_parse(rawdatum)[-1])
 
                 except ParseException:
-                    if raw_mbox == "":
+                    if rawdatum == "":
                         parsed.add("")
 
                     else:
-                        raise Exception("Error parsing string %s" % str(raw_mbox))
+                        raise Exception("Error parsing string %s" % str(rawdatum))
 
                 except:
                     raise
 
-            elif isinstance(raw_mbox, tuple):
+            elif isinstance(rawdatum, tuple):
                 try:
-                    parsed.add(raw_mbox[-1])
+                    parsed.add(rawdatum[-1])
 
                 except IndexError:
-                    raise Exception("Error unpacking tuple %s" % str(raw_mbox))
+                    raise Exception("Error unpacking tuple %s" % str(rawdatum))
 
                 except:
                     raise
 
             else:
-                raise Exception("Error processing %s" % str(raw_mbox))
+                raise Exception("Error processing %s" % str(rawdatum))
 
         return list(parsed)
 
 
-    def parseheader(self, header_list):
-        """Takes the raw output from an IMAP fetch of message headers in <header_list>, and Returns a list of dicts, each dict corresponding to a separate message header.
+    def validatemboxnames(self, mboxes):
+        """Takes a list of mailboxes as <mboxes> and searches for Google no-nos:
+
+        Leading whitespace,
+        Trailing whitespace,
+        More than one space,
+        Mailboxes that are identical if treated case insensitively.
+
+        Returns None if all is cool, or a dictionary with the symptom as the key and the mailboxes in a list.
+        """
+        ok = True
+
+        case_check = dict()
+
+        problems = dict()
+        problems["leading space"] = []
+        problems["trailing space"] = []
+        problems["multiple spaces"] = []
+        problems["case collision"] = []
+
+        for mbox in mboxes:
+            if mbox == "":
+                pass
+
+            elif mbox[0] == " ":
+                ok = False
+                problems["leading space"].append(mbox)
+
+            elif mbox[-1] == " ":
+                ok = False
+                problems["trailing space"].append(mbox)
+
+            elif mbox.find("  ") != -1:
+                ok = False
+                problems["multiple spaces"].append(mbox)
+
+            if case_check.has_key(mbox.lower()):
+                case_check[mbox.lower()].append(mbox)
+
+            else:
+                case_check[mbox.lower()] = [mbox]
+
+        for mboxgroup in case_check.values():
+            if len(mboxgroup) > 1:
+                ok = False
+                for mbox in mboxgroup:
+                    problems["case collision"].append(mbox)
+
+        for (reason, mboxgroup) in problems.items():
+            if mboxgroup == []:
+                problems.pop(reason)
+
+        if ok == False:
+            return(problems)
+
+        else:
+            return None
+
+
+    def parseheader(self, headers):
+        """Takes the raw output from an IMAP fetch of message headers in <headers>, and Returns a list of dicts, each dict corresponding to a separate message header.
 
         Example:
 
@@ -155,7 +214,7 @@ class imapstat:
         """
         return [
             dict(email.message_from_string(x[1]))
-            for x in header_list if x != ')'
+            for x in headers if x != ')'
         ]
 
 
