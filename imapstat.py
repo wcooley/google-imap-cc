@@ -94,7 +94,7 @@ class imapstat:
         >>> goodtuple = [('(\\HasNoChildren) "/" {34}', 'Other Users/hyndlatest/foo "quote"')]
         >>> bad = ['(\\Noinferiors) "INBOX"']
         >>> ims.parsemboxlist(goodstrings)
-        ['"_CECS/Asynchronous"', '', '"_CECS/CS162"', '"Trash/Sent Messages"', '"_CECS/CAT"', '"_CECS/Announce"', '"_CECS"', '"_CECS/CS201"', '"I Love Spam"', '"Sent"', '"INBOX"', '"Trash/Sent"', '"Notes"', '"Drafts"', '"Trash"', '"_CECS/CS163"', '"_CECS/CS202"']
+        ['', 'Trash/Sent Messages', '_CECS/Announce', '_CECS/Asynchronous', 'Drafts', '_CECS/CAT', 'Notes', '_CECS', '_CECS/CS163', '_CECS/CS162', '_CECS/CS202', '_CECS/CS201', 'INBOX', 'Trash/Sent', 'I Love Spam', 'Trash', 'Sent']
         >>> ims.parsemboxlist(goodtuple)
         ['Other Users/hyndlatest/foo "quote"']
         >>> ims.parsemboxlist(bad)
@@ -115,7 +115,7 @@ class imapstat:
         for rawdatum in rawdata:
             if isinstance(rawdatum, str):
                 try:
-                    parsed.add(mbox_parse(rawdatum)[-1])
+                    parsed.add(mbox_parse(rawdatum)[-1].strip('"'))
 
                 except ParseException:
                     if rawdatum == "":
@@ -152,9 +152,13 @@ class imapstat:
         Mailboxes that are identical if treated case insensitively.
 
         Returns None if all is cool, or a dictionary with the symptom as the key and the mailboxes in a list.
-        """
-        ok = True
 
+        Example:
+        >>> ims = imapstat()
+        >>> mboxlist = ['Shared Folders/archive/abuse/SpamReports/SR_Pubnet', 'Shared Folders/dept/cie/postmaster', 'Shared Folders/dept/arc/survey', 'sent', 'Spacey  ', '_PSU/Announce', 'Shared Folders/dept/cie/vendors', '_PSU/Administrative', 'Shared Folders/archive/abuse/spamfeedback', 'Shared Folders/dept/cie/os-updates', 'Trash/Sent', 'Shared Folders/dept/cie/webmaster', 'Sent', '_CECS/Advising', 'SENT', 'Shared Folders/dept/cie/printmaster', 'Shared Folders/dept/cie/unixteam', 'Sent-mail', 'Shared Folders/dept/oit/collab-team', 'Shared Folders/dept/cie/monitoring', '_Vendors/EMC', '_CECS/CS163', '_CECS/CS201', '_CECS/Machine Shop', 'Shared Folders/dept/cie/svn/adminutils', 'Shared Folders/archive/abuse/SpamReports/SR_CECS', 'Other Users/wcooley/unix student worker apps', 'Whitespace ', '_OIT', 'Shared Folders/dept/cie/svn/puppet', 'Shared Folders/archive/abuse/SpamReports/SR_Pre2007', 'Shared Folders/archive/abuse/spamfeedback/Scomp', 'Shared Folders/dept/cie/ids', '_Vendors/Sophos', '_OIT/Alerts', '_CECS/CS162', 'sent-mail', '_RT', '_PSU/Viking Motorsports', 'Shared Folders/archive/abuse/SpamReports/SR_ResNet', 'Shared Folders/dept/cie/license', 'INBOX', '_OIT/Email Access', '_Vendors/Spamhaus', '_PSU', 'Shared Folders/dept/cie/accountmaint', 'SENT-MAIL', 'Shared Folders/archive/abuse/SpamReports/solutions', '_CECS/CAT', 'Shared Folders/dept/cie/backups', 'Trash', 'Shared Folders/dept/cie/openpkg', 'Shared Folders/dept/cie/logs', '_CECS/CS251', 'Shared Folders/dept/cie/cfengine', '_OIT/Student Worker Apps', 'Shared Folders/dept/cie/maillists', '_OIT/Google', 'Shared Folders/archive/abuse/SpamReports/SR_Campus', 'Shared Folders/dept/cie/svn/cfengine', '_Vendors/Iron Mountain', 'Shared Folders/dept/cie/cron', 'I Love Spam', 'Shared Folders/dept/cie/install', 'Shared Folders/dept/cie/root', '_Vendors/Dell', '_CECS', '_Vendors/Red Hat', 'Notes', 'Shared Folders/dept/cie/massmail', 'Shared Folders/dept/cie/svn/nagios', '_CECS/Announce', 'Shared Folders/archive/abuse/spamtrap', '_OIT/Unixteam', 'Shared Folders/dept/cie/cfengine/disabled', 'Slash /Bang ', 'Drafts', 'Shared Folders/dept/cie', '_Vendors', '_Vendors/Oracle', 'Shared Folders/dept/cie/ids/Isaac', '_CECS/Asynchronous', 'Shared Folders/archive/abuse/SpamReports', 'Shared Folders/dept/cie/requests', 'Shared Folders/dept/cie/svn/massmail', 'Shared Folders/dept/cie/webmaster/sslmaster', '_OIT/Administrative', 'Shared Folders/archive/abuse', '_CECS/CS202', 'Trash/Sent Messages']
+        >>> ims.validatemboxnames(mboxlist)
+        {'trailing space': ['Spacey  ', 'Whitespace ', 'Slash /Bang '], 'case collision': ['sent', 'Sent', 'SENT', 'Sent-mail', 'sent-mail', 'SENT-MAIL']}
+        """
         case_check = dict()
 
         problems = dict()
@@ -165,38 +169,37 @@ class imapstat:
 
         # Initial pass--find whitespace violations, and populate case match dict.
         for mbox in mboxes:
-            if mbox == "":
-                pass
+            if len(mbox) > 0:
+                if mbox[0] == " " or mbox.find("/ ") != -1:
+                    problems["leading space"].append(mbox)
 
-            elif mbox[0] == " " or mbox.find("/ ") != -1:
-                ok = False
-                problems["leading space"].append(mbox)
+                if mbox[-1] == " " or mbox.find(" /") != -1:
+                    problems["trailing space"].append(mbox)
 
-            elif mbox[-1] == " " or mbox.find(" /") != -1:
-                ok = False
-                problems["trailing space"].append(mbox)
+                if mbox.find("  ") != -1:
+                    problems["multiple spaces"].append(mbox)
 
-            elif mbox.find("  ") != -1:
-                ok = False
-                problems["multiple spaces"].append(mbox)
+                if case_check.has_key(mbox.lower()):
+                    case_check[mbox.lower()].append(mbox)
 
-            if case_check.has_key(mbox.lower()):
-                case_check[mbox.lower()].append(mbox)
-
-            else:
-                case_check[mbox.lower()] = [mbox]
+                else:
+                    case_check[mbox.lower()] = [mbox]
 
         # Find case collisions.
         for mboxgroup in case_check.values():
             if len(mboxgroup) > 1:
-                ok = False
                 for mbox in mboxgroup:
                     problems["case collision"].append(mbox)
+
+        ok = True
 
         # Remove non-matching reasons.
         for (reason, mboxgroup) in problems.items():
             if mboxgroup == []:
                 problems.pop(reason)
+
+            else:
+                ok = False
 
         # Return accordingly.
         if ok == False:
@@ -288,9 +291,10 @@ class imapstat:
         self.connect(user)
         quota_used, quota = self.quotastat()
         mbox_list = self.mboxlist()
+        mbox_problems = self.validatemboxnames(mbox_list)
         self.disconnect()
 
-        return {"mbox_list":mbox_list,"quota":quota,"quota_used":quota_used}
+        return {"mbox_list":mbox_list,"quota":quota,"quota_used":quota_used,"mbox_problems":mbox_problems}
 
 
 if __name__ == "__main__":
