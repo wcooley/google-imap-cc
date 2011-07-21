@@ -12,7 +12,7 @@ def imapsync(ldapuri=None, state_memcaches=None, nosync_memcaches=None, imapserv
     cyrus_pf = imapsync_dir + "cyrus.pf"
     exclude_list = "'^Shared Folders|^mail/|^Junk$|^junk$|^JUNK$|^Spam$|^spam$|^SPAM$'"
     whitespace_cleanup = " --regextrans2 's/[ ]+/ /g' --regextrans2 's/\s+$//g' --regextrans2 's/\s+(?=\/)//g' --regextrans2 's/^\s+//g' --regextrans2 's/(?=\/)\s+//g'"
-    folder_cases = " --regextrans2 's/^drafts$/Drafts/i' --regextrans2 's/^trash$/Trash/i' --regextrans2 's/^sent$/Sent/i' --regextrans2 's/^sent-mail$/sent-mail/i' --regextrans2 's/^templates$/Templates/i'"
+    folder_cases = " --regextrans2 's/^drafts$/[Gmail]\/Drafts/i' --regextrans2 's/^trash$/[Gmail]\/Trash/i' --regextrans2 's/^(sent|sent-mail)$/[Gmail]\/Sent Mail/i'"
     extra_opts = " --delete2 --delete2folders --fast"
     exitstatus = "premature"
 
