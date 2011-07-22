@@ -62,8 +62,8 @@ class usersync:
 
     def launchuser(self, user=None):
         """Submits a asynchronous task for a given user, first checking memcache to see if there are extent tasks--if there are, it returns None. If clear, it returns the task id of the queued task."""
-        nosync_cache = memcache.Client(servers=nosync_memcaches)    # Users not-to-sync
-        cache = memcache.Client(servers=self.state_memcaches)       # System state
+        nosync_cache = memcache.Client(servers=self.nosync_memcaches)   # Users not-to-sync
+        cache = memcache.Client(servers=self.state_memcaches)           # System state
         cachekey = "(%s,auto)" % user
 
         try:    # If we can't contact the cache, we're in trouble.
