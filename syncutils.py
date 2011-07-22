@@ -62,25 +62,26 @@ class usersync:
 
     def launchuser(self, user=None):
         """Submits a asynchronous task for a given user, first checking memcache to see if there are extent tasks--if there are, it returns None. If clear, it returns the task id of the queued task."""
-        cache = memcache.Client(servers=self.state_memcaches)
+        nosync_cache = memcache.Client(servers=nosync_memcaches)    # Users not-to-sync
+        cache = memcache.Client(servers=self.state_memcaches)       # System state
         cachekey = "(%s,auto)" % user
 
         try:    # If we can't contact the cache, we're in trouble.
+            nosyncstate = nosync_cache.get(cachekey)
             userstate = cache.gets(cachekey)
 
         except:
             return {"submitted":False,"reason":"cache fetch error"}
 
-        if userstate == None:
+        if nosyncstate != None:     # If the key exists in this cache, skip the sync.
+            proceed = False
+            reason = "nosync"
+
+        if userstate == None:       # No known state. Ok.
             proceed = True
 
         elif userstate["status"] == "complete":
-            if userstate["returned"] == "ok" or userstate["returned"] == "error_255":
-                proceed = False
-                reason = userstate["returned"]
-
-            else:
-                proceed = True
+            proceed = True
 
         else:
             proceed = False
@@ -105,7 +106,7 @@ class usersync:
 
             cachedata = {"status":"queued", "timestamp":int(time()), "taskid":task.task_id}
 
-            if cache.cas(cachekey, cachedata, time=3600) == True:   # Return the task_id
+            if cache.cas(cachekey, cachedata, time=86400) == True:   # Return the task_id
                 return {"submitted":True,"taskid":task.task_id}
 
             else: # We had some trouble with the cache. Revoke the process and return None.
@@ -116,14 +117,18 @@ class usersync:
             return {"submitted":False,"reason":reason}
 
 
+    def launchlist(self, users=None, interval=0.5):
+        """Launches synchronization for an externally provided list of users. Interval is the time between submissions."""
+        for user in users
+            launchstatus = self.launchuser(user=user)
+            if launchstatus["submitted"] == True:
+                print("user %s : task id %s" % (user, launchstatus["taskid"]))
+                sleep(interval)
+            else:
+                print("user %s : %s" % (user, launchstatus["reason"]))
+
+
     def launchgroup(self, interval=0.5):
-        """Launches the tasksets created using populate(). Interval is the time between submissions."""
+        """Launches synchronization for the list created using populate(). Interval is the time between submissions."""
         for userlist in self.userlists:
-            for user in userlist:
-                launchstatus = self.launchuser(user=user)
-                if launchstatus["submitted"] == True:
-                    print("user %s : task id %s" % (user, launchstatus["taskid"]))
-                    sleep(interval)
-                elif launchstatus["reason"] == "ok" or launchstatus["reason"] == "error_255":
-                    print("user %s : %s" % (user, launchstatus["reason"]))
-                    userlist.remove(user)
+            self.launchlist(users=userlist, interval=interval)
