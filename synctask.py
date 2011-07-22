@@ -12,7 +12,7 @@ def imapsync(ldapuri=None, state_memcaches=None, nosync_memcaches=None, imapserv
     cyrus_pf = imapsync_dir + "cyrus.pf"
     exclude_list = "'^Shared Folders|^mail/|^Junk$|^junk$|^JUNK$|^Spam$|^spam$|^SPAM$'"
     whitespace_cleanup = " --regextrans2 's/[ ]+/ /g' --regextrans2 's/\s+$//g' --regextrans2 's/\s+(?=\/)//g' --regextrans2 's/^\s+//g' --regextrans2 's/(?=\/)\s+//g'"
-    folder_cases = " --regextrans2 's/^drafts$/[Gmail]\/Drafts/i' --regextrans2 's/^trash$/[Gmail]\/Trash/i' --regextrans2 's/^(sent|sent-mail)$/[Gmail]\/Sent Mail/i'"
+    folder_cases = " --regextrans2 's/^drafts$/[Gmail]\/Drafts/i' --regextrans2 's/^trash$/[Gmail]\/Trash/i' --regextrans2 's/^(sent|sent-mail)$/[Gmail]\/Sent Mail/i' --delete2foldersbutnot '^\[Gmail\]'"
     extra_opts = " --delete2 --delete2folders --fast"
     exitstatus = "premature"
 
@@ -39,11 +39,16 @@ def imapsync(ldapuri=None, state_memcaches=None, nosync_memcaches=None, imapserv
     nosync_cache = memcache.Client(servers=nosync_memcaches)    # Users not-to-sync
 
     cachekey = "(%s,auto)" % user
+    optinkey = "email_copy_progress.%s" % user
 
-    nosyncstate = nosync_cache.get(cachekey)
+    if nosync_cache.get(cachekey) != None:  # If the key exists in this cache, skip the sync.
+        return (user, "nosync")
 
-    if nosyncstate != None:     # If the key exists in this cache, skip the sync.
-        exitstatus = "nosync"
+    if cache.get(optinkey) != None:         # If the user has opted in, skip the sync.
+        if nosync_cache.set(cachekey,{"status":"nosync"}) != True:
+            raise Exception("Could not set %s in nosync_cache." % cachekey)
+
+        return (user, "nosync")
 
     directory = psuldap()       # Our LDAP handle
     directory.connect(ldapuri)  # Anonymous bind
@@ -54,15 +59,11 @@ def imapsync(ldapuri=None, state_memcaches=None, nosync_memcaches=None, imapserv
     # Loop through the search results. If any them match gmx.pdx.edu, set in the nosync cache.
     for (dn, result) in mailhostsearch:
         if result.has_key("mailHost"):
-            for mailhost in result["mailHost"]:
-                if mailhost == "gmx.pdx.edu":
-                    if nosync_cache.set(cachekey,{"status":"nosync"}) != True:
-                        raise Exception("Could not set %s in nosync_cache." % cachekey)
+            if "gmx.pdx.edu" in result["mailHost"]:
+                if nosync_cache.set(cachekey,{"status":"nosync"}) != True:
+                    raise Exception("Could not set %s in nosync_cache." % cachekey)
 
-                    exitstatus = "nosync"
-
-    if exitstatus == "nosync":  # User has been, or is newly added to nosync list. Let's exit.
-        return (user, exitstatus)
+                return (user, "nosync")
 
     # We can continue.
     cachestate = cache.gets(cachekey)
