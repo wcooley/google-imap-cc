@@ -119,7 +119,7 @@ class usersync:
 
     def launchlist(self, users=None, interval=0.5):
         """Launches synchronization for an externally provided list of users. Interval is the time between submissions."""
-        for user in users
+        for user in users:
             launchstatus = self.launchuser(user=user)
             if launchstatus["submitted"] == True:
                 print("user %s : task id %s" % (user, launchstatus["taskid"]))
