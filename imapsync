@@ -1170,8 +1170,10 @@ FOLDER: foreach my $h1_fold (@h1_folders_wanted) {
 	my @h2_hash_keys_sorted_by_uid 
 	  = sort {$h2_hash{$a}{'m'} <=> $h2_hash{$b}{'m'}} keys(%h2_hash);
 
-	
-	if($delete2) {
+	if (defined($delete2foldersbutnot) and ($h2_fold =~ $delete2foldersbutnot) ) {
+		print "Not deleting messages in $h2_fold\n";
+	}
+	elsif($delete2) {
 		my @h2_expunge;
 		foreach my $m_id (@h2_hash_keys_sorted_by_uid) {
 			#print "$m_id ";
@@ -3908,11 +3910,11 @@ sub delete_folders_in_2_not_in_1 {
 	my $dry_message = '';
 	$dry_message = "\t(not really since --dry mode)" if $dry;
 	foreach my $folder (@h2_folders_not_in_1) {
-		if ( defined($delete2foldersonly) and eval("\$folder !~ $delete2foldersonly" ) ) {
+		if ( defined($delete2foldersonly) and ($folder !~ $delete2foldersonly) ) {
 			print "Not deleting $folder because of --delete2foldersonly $delete2foldersonly\n";
 			next;
 		}
-		if ( defined($delete2foldersbutnot) and eval("\$folder =~ $delete2foldersbutnot" ) ) {
+		if ( defined($delete2foldersbutnot) and ($folder =~ $delete2foldersbutnot) ) {
 			print "Not deleting $folder because of --delete2foldersbutnot $delete2foldersbutnot\n";
 			next;
 		}
