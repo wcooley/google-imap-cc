@@ -65,15 +65,17 @@ class usersync:
         nosync_cache = memcache.Client(servers=self.nosync_memcaches)   # Users not-to-sync
         cache = memcache.Client(servers=self.state_memcaches)           # System state
         cachekey = "(%s,auto)" % user
+        optinkey = "email_copy_progress.%s" % user
 
         try:    # If we can't contact the cache, we're in trouble.
             nosyncstate = nosync_cache.get(cachekey)
             userstate = cache.gets(cachekey)
+            optinstate = cache.gets(cachekey)
 
         except:
             return {"submitted":False,"reason":"cache fetch error"}
 
-        if nosyncstate != None:     # If the key exists in this cache, skip the sync.
+        if nosyncstate != None or optinstate != None:   # If the key exists in this cache, skip the sync.
             proceed = False
             reason = "nosync"
 
@@ -119,16 +121,16 @@ class usersync:
 
     def launchlist(self, users=None, interval=0.5):
         """Launches synchronization for an externally provided list of users. Interval is the time between submissions."""
+        submitstat = []
+
         for user in users:
             launchstatus = self.launchuser(user=user)
             if launchstatus["submitted"] == True:
                 print("user %s : task id %s" % (user, launchstatus["taskid"]))
+                submitstat.append((user, True, launchstatus["taskid"]))
                 sleep(interval)
             else:
                 print("user %s : %s" % (user, launchstatus["reason"]))
+                submitstat.append((user, False, launchstatus["reason"]))
 
-
-    def launchgroup(self, interval=0.5):
-        """Launches synchronization for the list created using populate(). Interval is the time between submissions."""
-        for userlist in self.userlists:
-            self.launchlist(users=userlist, interval=interval)
+        return submitstat
