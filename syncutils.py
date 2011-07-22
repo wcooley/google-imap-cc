@@ -70,7 +70,7 @@ class usersync:
         try:    # If we can't contact the cache, we're in trouble.
             nosyncstate = nosync_cache.get(cachekey)
             userstate = cache.gets(cachekey)
-            optinstate = cache.gets(cachekey)
+            optinstate = cache.gets(optinkey)
 
         except:
             return {"submitted":False,"reason":"cache fetch error"}
