@@ -32,7 +32,6 @@ class imapstat:
         authstring = xoauth.GenerateXOauthString(xoconsumer, xotoken, xouser, "imap", xouser, None, None)
 
         self.imap = imaplib.IMAP4_SSL(self.gmailserver)
-        self.imap.debug = 4
         self.imap.authenticate("XOAUTH", lambda x: authstring)
 
 
