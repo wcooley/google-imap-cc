@@ -1,31 +1,59 @@
 import email
 import imaplib
+import xoauth
+import base64
 from pyparsing import Word, alphas, nums, printables, ZeroOrMore, ParseException
 
 class imapstat:
-    def __init__(self, imapserver=None, adminuser=None, adminpassword=None):
-        """Sets parameters for the object: <imapserver>, <adminuser>, and <adminpassword>."""
+    def __init__(self, imapserver=None, imapadmin=None, imappassword=None, gmaildomain=None, gmailsecret=None):
+        """Sets parameters for the object: <imapserver>, <imapadmin>, <imappassword>, <gmaildomain> and <gmailsecret>."""
         self.imapserver = imapserver
-        self.adminuser = adminuser
-        self.adminpassword = adminpassword
+        self.imapadmin = imapadmin
+        self.imappassword = imappassword
+        self.gmailserver = "imap.gmail.com"
+        self.gmaildomain = gmaildomain
+        self.gmailsecret = gmailsecret
 
 
-    def connect(self, user = None):
-        """Establishes a connection for <user>."""
-        authstring = "%s\x00%s\x00%s" % (user, self.adminuser, self.adminpassword)
+    def cyr_connect(self, user = None):
+        """Establishes a cyrus connection for <user>."""
+        authstring = "%s\x00%s\x00%s" % (user, self.imapadmin, self.imappassword)
 
         self.imap = imaplib.IMAP4_SSL(self.imapserver)
         self.imap.authenticate("PLAIN", lambda x: authstring)
 
 
+    def gmail_connect(self, user = None):
+        """Establishes a gmail connection for <user>."""
+        xoconsumer = xoauth.OAuthEntity(self.gmaildomain, self.gmailsecret)
+        xotoken = xoauth.OAuthEntity("","")
+        xouser = "%s@%s" % (user, self.gmaildomain)
+
+        authstring = xoauth.GenerateXOauthString(xoconsumer, xotoken, xouser, "imap", xouser, None, None)
+
+        self.imap = imaplib.IMAP4_SSL(self.gmailserver)
+        self.imap.debug = 4
+        self.imap.authenticate("XOAUTH", lambda x: authstring)
+
+
     def disconnect(self):
-        """Closes an established IMAP connection."""
+        """Closes an established IMAP cyr_connection."""
         self.imap.logout()
 
 
     def mboxstat(self, mbox):
         """Sends an IMAP select against the named <mbox>, returning True if the command succeeds, False otherwise."""
         sele_ret, msgs_cnt = self.imap.select(mbox, readonly = True)
+
+        if sele_ret == "OK":
+            return True
+        else: 
+            return False
+
+
+    def mboxdel(self, mbox):
+        """Deletes a IMAP <mbox>, returning True if the command succeeds, False otherwise."""
+        sele_ret, msgs_cnt = self.imap.delete(mbox)
 
         if sele_ret == "OK":
             return True
@@ -255,7 +283,7 @@ class imapstat:
         "For a given <user>, and a <mbox_list> of that user's mailboxes, searches each mailbox for messages that exceed <lower_bound> bytes in size, and returns the headers of those messages in a dict of lists, where each key resolves to a list of dicts, each of which contains a separate message header."""
         msg_list = dict()
 
-        self.connect(user)
+        self.cyr_connect(user)
         
         for mbox in mbox_list:
             try:
@@ -288,7 +316,7 @@ class imapstat:
         quota = 0
         quota_used = 0
 
-        self.connect(user)
+        self.cyr_connect(user)
         quota_used, quota = self.quotastat()
         mbox_list = self.mboxlist()
         mbox_problems = self.validatemboxnames(mbox_list)
