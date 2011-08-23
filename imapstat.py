@@ -42,7 +42,11 @@ class imapstat:
 
     def mboxstat(self, mbox):
         """Sends an IMAP select against the named <mbox>, returning True if the command succeeds, False otherwise."""
-        sele_ret, msgs_cnt = self.imap.select(mbox, readonly = True)
+        try:
+            sele_ret, msgs_cnt = self.imap.select(mbox, readonly = True)
+
+        except imaplib.IMAP4_SSL.error:
+            return False
 
         if sele_ret == "OK":
             return True
