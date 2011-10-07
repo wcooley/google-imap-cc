@@ -1,3 +1,5 @@
+"""Tools to query PSU ldap and parse python-ldap output."""
+
 import ldap
 
 class psuldap:
