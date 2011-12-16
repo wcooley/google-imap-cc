@@ -168,6 +168,9 @@ class imapstat:
                 except:
                     raise
 
+            elif rawdatum == None:
+                pass
+
             else:
                 raise Exception("Error processing %s" % str(rawdatum))
 

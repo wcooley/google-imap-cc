@@ -907,7 +907,7 @@ else {
 # consider (optional) includes and excludes
 if (scalar(@include)) {
 	foreach my $include (@include) {
-		my @included_folders = grep /$include/, @h1_folders_all;
+		my @included_folders = grep /$include/i, @h1_folders_all;
 		add_to_requested_folders(@included_folders);
 		print "Including folders matching pattern '$include': @included_folders\n";
 	}
@@ -916,7 +916,7 @@ if (scalar(@include)) {
 if (scalar(@exclude)) {
 	foreach my $exclude (@exclude) {
 		my @requested_folder = sort(keys(%requested_folder));
-		my @excluded_folders = grep /$exclude/, @requested_folder;
+		my @excluded_folders = grep /$exclude/i, @requested_folder;
 		remove_from_requested_folders(@excluded_folders);
 		print "Excluding folders matching pattern '$exclude': @excluded_folders\n";
 	}
@@ -2620,7 +2620,7 @@ sub copy_message {
 				$new_id = lastuid( $imap2, $h2_fold, $h2_uidguess ) ;
 			}
 			printf( "msg %s/%-19s copied to %s/%-10s\n", $h1_fold, "$h1_msg {$string_len}", $h2_fold, $new_id );
-			sleep 1;
+			#sleep 1;
 			$h2_uidguess++;
 			$total_bytes_transferred += $h1_size;
 			$nb_msg_transferred += 1;
@@ -3569,11 +3569,11 @@ Several options are mandatory.
 --folder      <string> : and this one, etc.
 --folderrec   <string> : sync this folder recursively.
 --folderrec   <string> : and this one, etc.
---include     <regex>  : sync folders matching this regular expression
+--include     <regex>  : sync folders matching this case insensitive regular expression
 --include     <regex>  : or this one, etc.
                          in case both --include --exclude options are
                          use, include is done before.
---exclude     <regex>  : skips folders matching this regular expression
+--exclude     <regex>  : skips folders matching this case insensitive regular expression
                          Several folders to avoid:
 			  --exclude 'fold1|fold2|f3' skips fold1, fold2 and f3.
 --exclude     <regex>  : or this one, etc.
